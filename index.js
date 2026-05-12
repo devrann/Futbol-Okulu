@@ -78,6 +78,14 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()) : true,
   credentials: true
 }));
+// HTTPS zorlaması — statik dosya ve sayfa isteklerini de kapsamalı (middleware sırası kritik)
+if (isProduction) {
+  app.set('trust proxy', 1);
+  app.use((req, res, next) => {
+    if (req.secure) return next();
+    return res.redirect(301, 'https://' + req.headers.host + req.originalUrl);
+  });
+}
 // Login rate limit - body parse'dan ÖNCE (geçersiz JSON ile bypass engeli)
 app.use((req, res, next) => {
   if (req.method === 'POST' && req.path === '/api/login') return loginLimiter(req, res, next);
@@ -112,17 +120,6 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 app.use(express.static('public'));
-
-// HTTPS zorlaması (production'da reverse proxy arkasında)
-if (isProduction) {
-  app.set('trust proxy', 1);
-  app.use((req, res, next) => {
-    if (req.headers['x-forwarded-proto'] !== 'https') {
-      return res.redirect(301, 'https://' + req.headers.host + req.originalUrl);
-    }
-    next();
-  });
-}
 
 // Genel API rate limiting (DoS koruması)
 const apiLimiter = rateLimit({
@@ -606,7 +603,12 @@ app.post('/api/login', async (req, res) => {
 
 // Çıkış (HttpOnly cookie temizle)
 app.post('/api/logout', (req, res) => {
-  res.clearCookie('token', { path: '/' });
+  res.clearCookie('token', {
+    path: '/',
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'strict'
+  });
   res.json({ success: true });
 });
 
@@ -1087,6 +1089,10 @@ async function notifyPeriodDebtors(periodId, opts = {}) {
   // 2) WhatsApp (Meta Cloud API). Yapılandırma yoksa sessizce atlanır.
   let whatsApp = null;
   if (includeWhatsApp && whatsappService.isEnabled()) {
+    const waTemplate =
+      (process.env.WHATSAPP_TEMPLATE_NAME_REMINDER || '').trim()
+      || (process.env.WHATSAPP_TEMPLATE_NAME || '').trim()
+      || null;
     const recipients = debtors.map((d) => ({
       phone: d.veliTelefon1 || d.veliTelefon2 || '',
       params: [
@@ -1095,10 +1101,10 @@ async function notifyPeriodDebtors(periodId, opts = {}) {
         Number(d.tutar || 0).toFixed(2) + ' TL',
         formatBitis || '-'
       ],
-      // Template yoksa bu metin denenir (USE_PLAIN=1 gerektirir)
+      // Şablon yoksa bu metin denenir (WHATSAPP_USE_PLAIN=1 gerektirir)
       text: `Sayın ${d.veliAdi || 'veli'}, ${d.ad} ${d.soyad} için ${donemAdi} dönemi ödemesi (${Number(d.tutar || 0).toFixed(2)} TL)${formatBitis ? ' son tarih ' + formatBitis : ''} bekleniyor.`
     })).filter(r => r.phone);
-    whatsApp = await whatsappService.sendBulk(recipients);
+    whatsApp = await whatsappService.sendBulk(recipients, waTemplate);
   }
 
   // 3) Her zaman: her veli için wa.me click-to-chat bağlantısı (manuel gönderim için)
@@ -1231,6 +1237,7 @@ app.post('/api/period-payments/:id/pay', auth.requireAdminOrYonetici, async (req
         const smsMsg = `Beşiktaş Futbol Okulu: ${payment.ad} ${payment.soyad} - ${payment.donemAdi} dönemi ödemeniz alındı. Tutar: ${payment.tutar.toFixed(2)} TL.`;
         sendSms(phoneNum, smsMsg).catch(() => {});
       }
+      whatsappService.notifyPaymentReceived(payment).catch(() => {});
       if (pushService.isEnabled() && payment.studentId) {
         db.getParentUserIdsByStudentId(payment.studentId).then((ids) => {
           if (ids && ids.length) {
@@ -2419,8 +2426,15 @@ async function checkAndActivatePeriods() {
     const periods = await db.getAllPeriods();
     
     for (const period of periods) {
-      if (period.durum === 'Bekliyor' && period.baslangicTarihi <= today) {
+      const durum = period.durum;
+      const baslangic = period.baslangicTarihi || period.baslangictarihi;
+      if (durum === 'Bekliyor' && baslangic && baslangic <= today) {
         await db.activatePeriod(period.id);
+        try {
+          await notifyPeriodDebtors(period.id, { includeWhatsApp: true });
+        } catch (e) {
+          logger.warn && logger.warn('Otomatik dönem bildirimi: ' + e.message);
+        }
       }
     }
   } catch (error) {
@@ -2440,6 +2454,10 @@ function validateProductionConfig() {
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
     console.error('FATAL: JWT_SECRET en az 32 karakter olmalı (güvenlik için)');
     process.exit(1);
+  }
+  const noPg = !process.env.DATABASE_URL || process.env.USE_SQLITE === 'true' || process.env.USE_SQLITE === '1';
+  if (noPg) {
+    console.warn('UYARI: PostgreSQL (DATABASE_URL) kullanılmıyor gibi görünüyor. Canlıda SQLite tek dosya + yedek riski yüksek; PostgreSQL önerilir.');
   }
 }
 

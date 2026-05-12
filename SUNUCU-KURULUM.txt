@@ -39,13 +39,17 @@
    a) developers.facebook.com üzerinden "WhatsApp Business Platform" kaydı açın.
    b) Uygulama oluşturun → "WhatsApp" ürünü ekleyin → Test numarası veya gerçek
       numara bağlayın; "Permanent access token" üretin.
-   c) "Message Templates" bölümünde "utility" kategoride bir template onaylatın.
-      Örnek ad: odeme_hatirlatma, dil: tr, gövde (body) şöyle olabilir:
-         Sayın {{1}}, {{2}} dönemi için {{3}} ödemesi son tarih {{4}}. Beşiktaş Futbol Okulu.
-   d) Aşağıdaki 3 satırı .env'ye ekleyin:
-         WHATSAPP_API_TOKEN=EAA...            (access token)
-         WHATSAPP_PHONE_NUMBER_ID=123456...   (Meta panelindeki numara ID'si)
+   c) "Message Templates" bölümünde iki utility şablon önerisi:
+      • Hatırlatma (ör. odeme_hatirlatma): dil tr, örnek gövde
+        Sayın {{1}}, {{2}} dönemi için {{3}} ödemesi, son tarih {{4}}. Beşiktaş Futbol Okulu.
+      • Ödeme alındı (ör. odeme_alindi): dil tr, örnek gövde
+        Sayın {{1}}, {{2}} için {{3}} dönemi ödemesi {{4}} olarak kaydedilmiştir. Beşiktaş Futbol Okulu.
+   d) .env örneği:
+         WHATSAPP_API_TOKEN=EAA...
+         WHATSAPP_PHONE_NUMBER_ID=123456...
          WHATSAPP_TEMPLATE_NAME=odeme_hatirlatma
+         WHATSAPP_TEMPLATE_NAME_PAYMENT=odeme_alindi
+      (Sadece hatırlatmada farklı şablon isterseniz: WHATSAPP_TEMPLATE_NAME_REMINDER=...)
       Kaydedip uygulamayı yeniden başlatın.
    - Bu satırları doldurmadıysanız sistem "wa.me" tek-tık bağlantıları üretir
      ve yöneticiniz her veliye tek tıkla WhatsApp'tan gönderebilir (ücretsiz).
