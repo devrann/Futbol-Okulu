@@ -105,7 +105,11 @@ function requireParentNotesAccess(req, res, next) {
   if (isNaN(parentUserId) || parentUserId < 1) {
     return res.status(400).json({ error: 'Geçersiz ID' });
   }
-  if (req.user.rol === 'veli' && req.user.id !== parentUserId) {
+  if (req.user.rol === 'veli') {
+    if (req.user.id !== parentUserId) {
+      return res.status(403).json({ error: 'Yetkisiz erişim' });
+    }
+  } else if (!['admin', 'yonetici'].includes(req.user.rol)) {
     return res.status(403).json({ error: 'Yetkisiz erişim' });
   }
   next();

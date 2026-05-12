@@ -129,6 +129,19 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 });
+
+// QR check-in rate limiting - token başına ve IP başına dakikada 30 istek
+const qrCheckinLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 dakika
+  max: 30,
+  message: { error: 'Çok fazla check-in denemesi. Lütfen bir dakika bekleyin.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const token = (req.body?.token || '').slice(0, 32);
+    return token ? `qr:${token}` : req.ip;
+  }
+});
 app.use('/api/', apiLimiter);
 
 // Login rate limiting - IP + kullanıcı adı bazlı (dağıtık brute force'a karşı)
@@ -1714,7 +1727,7 @@ app.get('/api/attendance/qr/info', async (req, res) => {
 });
 
 /** Public: öğrenci seçip "Geldim" — yoklamaya 'Var' olarak düşer */
-app.post('/api/attendance/qr/checkin', async (req, res) => {
+app.post('/api/attendance/qr/checkin', qrCheckinLimiter, async (req, res) => {
   try {
     const token = (req.body.token || '').trim();
     const studentId = safeParseId(req.body.studentId);

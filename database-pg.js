@@ -12,6 +12,10 @@ if (!DATABASE_URL || typeof DATABASE_URL !== 'string' || !DATABASE_URL.trim()) {
 
 const pool = new Pool({
   connectionString: DATABASE_URL.trim(),
+  ssl: process.env.DATABASE_SSL === 'false' ? false :
+       (DATABASE_URL.includes('supabase.co') || DATABASE_URL.includes('supabase.com') || process.env.DATABASE_SSL === 'true'
+        ? { rejectUnauthorized: false }
+        : false),
   max: 15,
   idleTimeoutMillis: 20000,
   connectionTimeoutMillis: 10000,
@@ -92,7 +96,7 @@ async function createMissingParentUsers() {
       const kullaniciAdi = st.tcNo || st.tcno || ('veli' + st.id);
       const check = await pool.query('SELECT id FROM users WHERE kullaniciadi = $1', [kullaniciAdi]);
       if (check.rows.length > 0) continue;
-      const sifre = st.tcNo || st.tcno || crypto.randomBytes(4).toString('hex');
+      const sifre = crypto.randomBytes(8).toString('base64url');
       const studentRes = await pool.query('SELECT subeid FROM students WHERE id = $1', [st.id]);
       const subeId = studentRes.rows[0]?.subeid ?? studentRes.rows[0]?.subeId ?? null;
       const hashedSifre = await bcrypt.hash(sifre, 10);
@@ -673,7 +677,7 @@ async function addStudent(student) {
 async function createParentUser(client, studentId, veliAdi, tcNo, telefon, email) {
   try {
     const kullaniciAdi = tcNo || ('veli' + studentId);
-    const sifre = tcNo || crypto.randomBytes(4).toString('hex');
+    const sifre = crypto.randomBytes(8).toString('base64url');
     const existing = await pool.query('SELECT id FROM users WHERE kullaniciadi = $1', [kullaniciAdi]);
     if (existing.rows.length > 0) return null;
     const studentRes = await pool.query('SELECT subeid FROM students WHERE id = $1', [studentId]);
@@ -684,7 +688,7 @@ async function createParentUser(client, studentId, veliAdi, tcNo, telefon, email
       VALUES ($1, $2, 'veli', $3, $4, $5, $6, $7, 1, $8)
       RETURNING id
     `, [kullaniciAdi, hashedSifre, veliAdi, telefon || null, email || null, studentId, subeId, new Date().toISOString()]);
-    return { id: res.rows[0].id, kullaniciAdi, ...(tcNo ? {} : { sifre }) };
+    return { id: res.rows[0].id, kullaniciAdi, sifre };
   } catch (error) {
     console.error('Veli kullanıcısı oluşturma hatası:', error.message);
     return null;
