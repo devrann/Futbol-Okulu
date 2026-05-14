@@ -55,9 +55,27 @@ function normRow(row) {
 }
 
 // Tüm query sonuçlarını camelCase'e çevir (frontend uyumu)
+// pg-pool: pool.query içerde this.connect(cb) ile callback kullanır. connect override
+// callback'i iletmezse sorgu asla tamamlanmaz (sonsuz bekleme).
+// client.query callback modunda Promise dönmez; .then() kullanılamaz.
 function wrapQuery(originalQuery) {
-  return function(...args) {
-    return originalQuery.apply(this, args).then(res => {
+  return function wrappedQuery(...args) {
+    const last = args[args.length - 1];
+    if (typeof last === 'function') {
+      const cb = last;
+      const head = args.slice(0, -1);
+      return originalQuery.apply(this, head.concat([
+        function onQuery(err, res) {
+          if (err) return cb(err);
+          if (res && res.rows && res.rows.length > 0) {
+            res.rows = normRows(res.rows);
+          }
+          return cb(err, res);
+        },
+      ]));
+    }
+    const out = originalQuery.apply(this, args);
+    return Promise.resolve(out).then((res) => {
       if (res && res.rows && res.rows.length > 0) {
         res.rows = normRows(res.rows);
       }
@@ -68,10 +86,22 @@ function wrapQuery(originalQuery) {
 pool.query = wrapQuery(pool.query.bind(pool));
 
 const _connect = pool.connect.bind(pool);
-pool.connect = function() {
-  return _connect().then(client => {
-    const _clientQuery = client.query.bind(client);
-    client.query = wrapQuery(_clientQuery);
+function patchClientQueryForRowNorm(client) {
+  if (!client || client.__foPgRowNorm) return;
+  const orig = client.query.bind(client);
+  Object.defineProperty(client, '__foPgRowNorm', { value: true, enumerable: false });
+  client.query = wrapQuery(orig);
+}
+pool.connect = function connectPatched(cb) {
+  if (typeof cb === 'function') {
+    return _connect((err, client, release) => {
+      if (err) return cb(err);
+      patchClientQueryForRowNorm(client);
+      return cb(err, client, release);
+    });
+  }
+  return _connect().then((client) => {
+    patchClientQueryForRowNorm(client);
     return client;
   });
 };
