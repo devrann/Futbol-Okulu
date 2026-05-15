@@ -1,4 +1,4 @@
-const CACHE_NAME = 'futbol-okulu-v4';
+const CACHE_NAME = 'futbol-okulu-v5';
 const STATIC_ASSETS = [
   '/',
   '/login.html',
@@ -19,8 +19,13 @@ const STATIC_ASSETS = [
   '/push-client.js',
   '/manifest.json',
   '/css/responsive.css',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/favicon.ico',
+  '/favicon.svg',
+  '/favicon-96x96.png',
+  '/apple-touch-icon.png',
+  '/web-app-manifest-192x192.png',
+  '/web-app-manifest-512x512.png',
+  '/site.webmanifest'
 ];
 
 self.addEventListener('install', (e) => {
@@ -62,8 +67,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Futbol Okulu';
   const options = {
     body: payload.body || '',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: '/web-app-manifest-192x192.png',
+    badge: '/web-app-manifest-192x192.png',
     data: { url: payload.url || '/' },
     vibrate: [100, 50, 100]
   };
