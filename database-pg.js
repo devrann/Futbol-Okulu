@@ -807,21 +807,21 @@ async function getAllUsers(subeId = null) {
   await ensureReady();
   if (subeId) {
     const res = await pool.query(
-      `SELECT id, kullaniciAdi, rol, adSoyad, telefon, email, subeId, "studentId", aktif, olusturmaTarihi FROM users WHERE (subeId = $1 OR (rol = 'veli' AND "studentId" IN (
+      `SELECT id, kullaniciadi, rol, adsoyad, telefon, email, subeid, studentid, aktif, olusturmatarihi FROM users WHERE (subeid = $1 OR (rol = 'veli' AND studentid IN (
         SELECT s.id FROM students s
-        LEFT JOIN groups g ON s."groupId" = g.id
-        LEFT JOIN users u ON g."instructorId" = u.id
-        WHERE s.subeId = $2 OR g.subeId = $3 OR u.subeId = $4
+        LEFT JOIN groups g ON s.groupid = g.id
+        LEFT JOIN users u ON g.instructorid = u.id
+        WHERE s.subeid = $2 OR g.subeid = $3 OR u.subeid = $4
         UNION
-        SELECT spp.studentId FROM student_period_payments spp
-        JOIN payment_periods pp ON spp.periodId = pp.id
-        WHERE pp.subeId = $5
+        SELECT spp.studentid FROM student_period_payments spp
+        JOIN payment_periods pp ON spp.periodid = pp.id
+        WHERE pp.subeid = $5
       ))) ORDER BY id DESC`,
       [subeId, subeId, subeId, subeId, subeId]
     );
     return res.rows;
   }
-  const res = await pool.query('SELECT id, kullaniciAdi, rol, adSoyad, telefon, email, subeId, "studentId", aktif, olusturmaTarihi FROM users ORDER BY id DESC');
+  const res = await pool.query('SELECT id, kullaniciadi, rol, adsoyad, telefon, email, subeid, studentid, aktif, olusturmatarihi FROM users ORDER BY id DESC');
   return res.rows;
 }
 
@@ -833,15 +833,15 @@ async function searchUsers(subeId = null, opts = {}) {
   const where = [];
   let i = 1;
   if (subeId) {
-    where.push(`(subeId = $${i++} OR (rol = 'veli' AND "studentId" IN (
+    where.push(`(subeid = $${i++} OR (rol = 'veli' AND studentid IN (
       SELECT s.id FROM students s
-      LEFT JOIN groups g ON s."groupId" = g.id
-      LEFT JOIN users u ON g."instructorId" = u.id
-      WHERE s.subeId = $${i++} OR g.subeId = $${i++} OR u.subeId = $${i++}
+      LEFT JOIN groups g ON s.groupid = g.id
+      LEFT JOIN users u ON g.instructorid = u.id
+      WHERE s.subeid = $${i++} OR g.subeid = $${i++} OR u.subeid = $${i++}
       UNION
-      SELECT spp.studentId FROM student_period_payments spp
-      JOIN payment_periods pp ON spp.periodId = pp.id
-      WHERE pp.subeId = $${i++}
+      SELECT spp.studentid FROM student_period_payments spp
+      JOIN payment_periods pp ON spp.periodid = pp.id
+      WHERE pp.subeid = $${i++}
     )))`);
     params.push(subeId, subeId, subeId, subeId, subeId);
   }
@@ -849,7 +849,7 @@ async function searchUsers(subeId = null, opts = {}) {
   const searchTerm = (q || '').trim();
   if (searchTerm) {
     const like = '%' + String(searchTerm).replace(/[%_\\]/g, '\\$&') + '%';
-    where.push(`(kullaniciAdi ILIKE $${i} OR adSoyad ILIKE $${i} OR telefon ILIKE $${i} OR email ILIKE $${i})`);
+    where.push(`(kullaniciadi ILIKE $${i} OR adsoyad ILIKE $${i} OR telefon ILIKE $${i} OR email ILIKE $${i})`);
     params.push(like);
     i++;
   }
@@ -861,7 +861,7 @@ async function searchUsers(subeId = null, opts = {}) {
   const limitParam = params.length + 1;
   params.push(limitVal, offsetVal);
   const res = await pool.query(`
-    SELECT id, kullaniciAdi, rol, adSoyad, telefon, email, subeId, aktif, olusturmaTarihi
+    SELECT id, kullaniciadi, rol, adsoyad, telefon, email, subeid, aktif, olusturmatarihi
     FROM users ${whereClause} ORDER BY id DESC LIMIT $${limitParam} OFFSET $${limitParam + 1}
   `, params);
   return { rows: res.rows, total };
@@ -883,7 +883,7 @@ async function getVeliDiagnostic(subeId) {
     const laraStudentIds = laraIdsRes.rows.map(r => r.id);
     if (laraStudentIds.length) {
       const placeholders = laraStudentIds.map((_, i) => `$${i + 1}`).join(',');
-      const vwRes = await pool.query(`SELECT id, adSoyad, "studentId", "subeId" FROM users WHERE rol = 'veli' AND "studentId" IN (${placeholders})`, laraStudentIds);
+      const vwRes = await pool.query(`SELECT id, adsoyad, studentid, subeid FROM users WHERE rol = 'veli' AND studentid IN (${placeholders})`, laraStudentIds);
       velilerWithLaraStudent = vwRes.rows;
     }
   }
@@ -942,7 +942,7 @@ async function createUser(user) {
   await ensureReady();
   const hashedSifre = user.sifre ? await bcrypt.hash(user.sifre, 10) : '';
   const res = await pool.query(`
-    INSERT INTO users (kullaniciAdi, sifre, rol, adSoyad, telefon, email, studentId, subeId, aktif, olusturmaTarihi)
+    INSERT INTO users (kullaniciadi, sifre, rol, adsoyad, telefon, email, studentid, subeid, aktif, olusturmatarihi)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING id
   `, [user.kullaniciAdi, hashedSifre, user.rol, user.adSoyad, user.telefon || null, user.email || null, user.studentId || null, user.subeId || null, user.aktif !== undefined ? user.aktif : 1, user.olusturmaTarihi || new Date().toISOString()]);
