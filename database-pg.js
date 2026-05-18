@@ -725,36 +725,108 @@ async function createParentUser(client, studentId, veliAdi, tcNo, telefon, email
   }
 }
 
+/** Dönem / kayıt tarihlerinden YYYY-MM-DD karşılaştırması için { y, m, d } */
+function parseDebtCalendarYmd(val) {
+  if (val == null || val === '') return null;
+  const s = String(val).trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) return { y: +m[1], m: +m[2], d: +m[3] };
+  m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})\b/.exec(s);
+  if (m) return { y: +m[3], m: +m[2], d: +m[1] };
+  const t = new Date(s).getTime();
+  if (!isNaN(t)) {
+    const x = new Date(t);
+    return { y: x.getUTCFullYear(), m: x.getUTCMonth() + 1, d: x.getUTCDate() };
+  }
+  return null;
+}
+
+function debtYmdCmp(a, b) {
+  if (!a || !b) return 0;
+  const ca = a.y * 10000 + a.m * 100 + a.d;
+  const cb = b.y * 10000 + b.m * 100 + b.d;
+  return ca === cb ? 0 : ca < cb ? -1 : 1;
+}
+
+/** bitiş günü hariç: [bas, bit) — örn. 4 Mayıs–1 Haziran → 28 gün (4 hafta) */
+function debtDaysExclusive(startYmd, endExclusiveYmd) {
+  if (!startYmd || !endExclusiveYmd) return 0;
+  const a = Date.UTC(startYmd.y, startYmd.m - 1, startYmd.d);
+  const b = Date.UTC(endExclusiveYmd.y, endExclusiveYmd.m - 1, endExclusiveYmd.d);
+  return Math.max(0, Math.round((b - a) / 86400000));
+}
+
+/** ISO veya timestamp kayıt → İstanbul yerel takvim günü (operasyon Türkiye odaklı) */
+function kayitYmdFromKayitTarihi(kayitTarihi) {
+  const s = String(kayitTarihi || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return parseDebtCalendarYmd(s);
+  const inst = new Date(s);
+  if (isNaN(inst.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Istanbul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(inst);
+    const y = +parts.find((p) => p.type === 'year').value;
+    const m = +parts.find((p) => p.type === 'month').value;
+    const d = +parts.find((p) => p.type === 'day').value;
+    return { y, m, d };
+  } catch (_) {
+    return parseDebtCalendarYmd(inst.toISOString().slice(0, 10));
+  }
+}
+
+function periodDebtBounds(period) {
+  const basRaw = period.baslangicTarihi ?? period.baslangictarihi;
+  const bitRaw = period.bitisTarihi ?? period.bitistarihi;
+  return { bas: parseDebtCalendarYmd(basRaw), bit: parseDebtCalendarYmd(bitRaw) };
+}
+
 async function createProportionalDebtsForNewStudent(client, studentId, kayitTarihi) {
   try {
-    const studentRes = await pool.query('SELECT subeId FROM students WHERE id = $1', [studentId]);
+    const studentRes = await pool.query('SELECT subeid FROM students WHERE id = $1', [studentId]);
     const student = studentRes.rows[0];
+    const subeIdVal = student ? (student.subeid ?? student.subeId) : null;
     let query = "SELECT * FROM payment_periods WHERE durum = 'Aktif'";
     let activePeriods;
-    if (student && student.subeId) {
-      query += " AND (subeId = $1 OR subeId IS NULL)";
-      activePeriods = (await pool.query(query, [student.subeId])).rows;
+    if (subeIdVal != null && subeIdVal !== '') {
+      query += ' AND (subeid = $1 OR subeid IS NULL)';
+      activePeriods = (await pool.query(query, [subeIdVal])).rows;
     } else {
       activePeriods = (await pool.query(query)).rows;
     }
+    const kayitYmd = kayitYmdFromKayitTarihi(kayitTarihi);
+    if (!kayitYmd) {
+      console.error('Orantılı borç: geçersiz kayıt tarihi:', kayitTarihi);
+      return;
+    }
+
     for (const period of activePeriods) {
-      const kayitDate = new Date(kayitTarihi);
-      const bitisDate = new Date(period.bitisTarihi);
-      const baslangicDate = new Date(period.baslangicTarihi);
-      if (kayitDate > bitisDate) continue;
-      if (kayitDate <= baslangicDate) {
+      const tutarBase = parseFloat(period.tutar);
+      if (!period.id || isNaN(tutarBase)) continue;
+
+      const { bas, bit } = periodDebtBounds(period);
+      if (!bas || !bit) continue;
+
+      // Kayıt dönem bitişinden sonra veya bitiş gününde (exclusive bitiş): borç yok
+      if (debtYmdCmp(kayitYmd, bit) >= 0) continue;
+
+      // Kayıt başlangıç günü veya öncesi: tam dönem ücreti (iş kuralı — mevcut davranış)
+      if (debtYmdCmp(kayitYmd, bas) <= 0) {
         await pool.query(`
           INSERT INTO student_period_payments (studentId, periodId, tutar, odemeDurumu, olusturmaTarihi)
           VALUES ($1, $2, $3, 'Borçlu', $4)
-        `, [studentId, period.id, period.tutar, new Date().toISOString()]);
+        `, [studentId, period.id, tutarBase, new Date().toISOString()]);
         continue;
       }
-      // Orantılı hesaplama: Dönem haftalara bölünür, kalan hafta sayısına göre tutar hesaplanır
-      const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
-      const toplamHafta = Math.max(1, Math.ceil((bitisDate - baslangicDate) / MS_PER_WEEK));
-      const kalanHafta = Math.ceil((bitisDate - kayitDate) / MS_PER_WEEK);
-      const kalanHaftaClamped = Math.min(toplamHafta, Math.max(1, kalanHafta));
-      const orantiliTutar = (period.tutar * kalanHaftaClamped) / toplamHafta;
+
+      const totalDays = debtDaysExclusive(bas, bit);
+      const remainingDays = debtDaysExclusive(kayitYmd, bit);
+      const totalDaysClamped = Math.max(1, totalDays);
+      const remainingDaysClamped = Math.max(1, remainingDays);
+      const orantiliTutar = (tutarBase * remainingDaysClamped) / totalDaysClamped;
       await pool.query(`
         INSERT INTO student_period_payments (studentId, periodId, tutar, odemeDurumu, olusturmaTarihi)
         VALUES ($1, $2, $3, 'Borçlu', $4)
@@ -2251,30 +2323,39 @@ async function createProportionalDebtsForReturningStudent(studentId, dönüsTari
   await ensureReady();
   const client = await pool.connect();
   try {
-    const studentRes = await pool.query('SELECT subeId FROM students WHERE id = $1', [studentId]);
+    const studentRes = await pool.query('SELECT subeid FROM students WHERE id = $1', [studentId]);
     const student = studentRes.rows[0];
+    const subeIdVal = student ? (student.subeid ?? student.subeId) : null;
     let query = "SELECT * FROM payment_periods WHERE durum = 'Aktif'";
     let activePeriods;
-    if (student && student.subeid) {
-      query += " AND (subeId = $1 OR subeId IS NULL)";
-      activePeriods = (await pool.query(query, [student.subeid])).rows;
+    if (subeIdVal != null && subeIdVal !== '') {
+      query += ' AND (subeid = $1 OR subeid IS NULL)';
+      activePeriods = (await pool.query(query, [subeIdVal])).rows;
     } else {
       activePeriods = (await pool.query(query)).rows;
     }
+
+    const donusYmd = kayitYmdFromKayitTarihi(dönüsTarihi);
+    if (!donusYmd) return;
+
     for (const period of activePeriods) {
       const existingRes = await pool.query('SELECT id FROM student_period_payments WHERE studentId = $1 AND periodId = $2', [studentId, period.id]);
       if (existingRes.rows.length > 0) continue;
-      const donusDate = new Date(dönüsTarihi);
-      const bitisDate = new Date(period.bitisTarihi);
-      const baslangicDate = new Date(period.baslangicTarihi);
-      if (donusDate > bitisDate) continue;
-      let orantiliTutar = period.tutar;
-      if (donusDate > baslangicDate) {
-        const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
-        const toplamHafta = Math.max(1, Math.ceil((bitisDate - baslangicDate) / MS_PER_WEEK));
-        const kalanHafta = Math.ceil((bitisDate - donusDate) / MS_PER_WEEK);
-        const kalanHaftaClamped = Math.min(toplamHafta, Math.max(1, kalanHafta));
-        orantiliTutar = (period.tutar * kalanHaftaClamped) / toplamHafta;
+
+      const tutarBase = parseFloat(period.tutar);
+      if (!period.id || isNaN(tutarBase)) continue;
+
+      const { bas, bit } = periodDebtBounds(period);
+      if (!bas || !bit) continue;
+      if (debtYmdCmp(donusYmd, bit) >= 0) continue;
+
+      let orantiliTutar = tutarBase;
+      if (debtYmdCmp(donusYmd, bas) > 0) {
+        const totalDays = debtDaysExclusive(bas, bit);
+        const remainingDays = debtDaysExclusive(donusYmd, bit);
+        const totalDaysClamped = Math.max(1, totalDays);
+        const remainingDaysClamped = Math.max(1, remainingDays);
+        orantiliTutar = (tutarBase * remainingDaysClamped) / totalDaysClamped;
       }
       await pool.query(`
         INSERT INTO student_period_payments (studentId, periodId, tutar, odemeDurumu, olusturmaTarihi)
