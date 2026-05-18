@@ -678,8 +678,23 @@ async function getStudentsByParentUserId(parentUserId) {
   return res.rows;
 }
 
+const ERR_TC_VELI_REQUIRED = 'TC Kimlik No zorunlu - veli hesabı oluşturulamadı';
+
+function normalizeTcDigits(tcNo) {
+  return String(tcNo || '').replace(/\D/g, '');
+}
+
+function isValidVeliTcDigits(tcDigits) {
+  return tcDigits.length === 11;
+}
+
 async function addStudent(student) {
   await ensureReady();
+  const tcNorm = normalizeTcDigits(student.tcNo);
+  if (!isValidVeliTcDigits(tcNorm)) {
+    throw new Error(ERR_TC_VELI_REQUIRED);
+  }
+  student.tcNo = tcNorm;
   const client = await pool.connect();
   try {
     const res = await pool.query(`
@@ -687,15 +702,20 @@ async function addStudent(student) {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id
     `, [
-      student.ad, student.soyad, student.tcNo || null, student.dogumTarihi,
+      student.ad, student.soyad, student.tcNo, student.dogumTarihi,
       student.veliAdi, student.email || null, student.veliTelefon1, student.veliTelefon2 || null,
       student.mahalle || null, student.okul || null, student.kayitKaynagi || null,
       student.kayitTarihi, student.groupId || null, student.subeId || null
     ]);
     const studentId = res.rows[0].id;
     await createProportionalDebtsForNewStudent(client, studentId, student.kayitTarihi);
-    const parentCred = await createParentUser(client, studentId, student.veliAdi, student.tcNo, student.veliTelefon1, student.email);
-    return { id: studentId, ...student, parentCredentials: parentCred };
+    const parentCred = await createParentUser(studentId, student.veliAdi, student.tcNo, student.veliTelefon1, student.email);
+    if (!parentCred) {
+      await pool.query('DELETE FROM student_period_payments WHERE studentId = $1', [studentId]);
+      await pool.query('DELETE FROM students WHERE id = $1', [studentId]);
+      throw new Error('Bu TC ile kayıtlı veli kullanıcısı zaten var veya veli hesabı oluşturulamadı.');
+    }
+    return { id: studentId, ...student };
   } catch (error) {
     console.error('ADD STUDENT HATASI:', error.message);
     throw error;
@@ -704,21 +724,21 @@ async function addStudent(student) {
   }
 }
 
-async function createParentUser(client, studentId, veliAdi, tcNo, telefon, email) {
+async function createParentUser(studentId, veliAdi, tcNo, telefon, email) {
   try {
-    const kullaniciAdi = tcNo || ('veli' + studentId);
-    const sifre = crypto.randomBytes(8).toString('base64url');
+    const kullaniciAdi = normalizeTcDigits(tcNo);
+    if (!isValidVeliTcDigits(kullaniciAdi)) return null;
     const existing = await pool.query('SELECT id FROM users WHERE kullaniciadi = $1', [kullaniciAdi]);
     if (existing.rows.length > 0) return null;
     const studentRes = await pool.query('SELECT subeid FROM students WHERE id = $1', [studentId]);
     const subeId = studentRes.rows[0]?.subeid ?? studentRes.rows[0]?.subeId ?? null;
-    const hashedSifre = await bcrypt.hash(sifre, 10);
+    const hashedSifre = await bcrypt.hash(kullaniciAdi, 10);
     const res = await pool.query(`
       INSERT INTO users (kullaniciadi, sifre, rol, adsoyad, telefon, email, studentid, subeid, aktif, olusturmatarihi)
       VALUES ($1, $2, 'veli', $3, $4, $5, $6, $7, 1, $8)
       RETURNING id
     `, [kullaniciAdi, hashedSifre, veliAdi, telefon || null, email || null, studentId, subeId, new Date().toISOString()]);
-    return { id: res.rows[0].id, kullaniciAdi, sifre };
+    return { id: res.rows[0].id, kullaniciAdi };
   } catch (error) {
     console.error('Veli kullanıcısı oluşturma hatası:', error.message);
     return null;

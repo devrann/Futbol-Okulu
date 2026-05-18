@@ -496,56 +496,68 @@ function getStudentsByParentUserId(parentUserId) {
   return stmt.all(...ids);
 }
 
+const ERR_TC_VELI_REQUIRED = 'TC Kimlik No zorunlu - veli hesabı oluşturulamadı';
+
+function normalizeTcDigits(tcNo) {
+  return String(tcNo || '').replace(/\D/g, '');
+}
+
+function isValidVeliTcDigits(tcDigits) {
+  return tcDigits.length === 11;
+}
+
 function addStudent(student) {
   try {
+    const tcNorm = normalizeTcDigits(student.tcNo);
+    if (!isValidVeliTcDigits(tcNorm)) {
+      throw new Error(ERR_TC_VELI_REQUIRED);
+    }
+    student.tcNo = tcNorm;
     const stmt = db.prepare(`
       INSERT INTO students (ad, soyad, tcNo, dogumTarihi, veliAdi, email, veliTelefon1, veliTelefon2, mahalle, okul, kayitKaynagi, kayitTarihi, groupId, subeId)
       VALUES (@ad, @soyad, @tcNo, @dogumTarihi, @veliAdi, @email, @veliTelefon1, @veliTelefon2, @mahalle, @okul, @kayitKaynagi, @kayitTarihi, @groupId, @subeId)
     `);
     const info = stmt.run(student);
     const studentId = info.lastInsertRowid;
-    
-   // Aktif dönemler için orantılı borç oluştur
+
     createProportionalDebtsForNewStudent(studentId, student.kayitTarihi);
-    
-    // Veli kullanıcısı oluştur (TC yoksa rastgele şifre döner)
+
     const parentCred = createParentUser(studentId, student.veliAdi, student.tcNo, student.veliTelefon1, student.email);
-    
-    return { id: studentId, ...student, parentCredentials: parentCred };
-    
+    if (!parentCred) {
+      db.prepare('DELETE FROM student_period_payments WHERE studentId = ?').run(studentId);
+      db.prepare('DELETE FROM students WHERE id = ?').run(studentId);
+      throw new Error('Bu TC ile kayıtlı veli kullanıcısı zaten var veya veli hesabı oluşturulamadı.');
+    }
+
+    return { id: studentId, ...student };
   } catch (error) {
     console.error('ADD STUDENT HATASI:', error.message);
     throw error;
   }
 }
 
-// Veli kullanıcısı otomatik oluştur
+// Veli kullanıcısı otomatik oluştur (kullanıcı adı ve şifre: 11 haneli TC)
 function createParentUser(studentId, veliAdi, tcNo, telefon, email) {
   try {
-    // Kullanıcı adı ve şifre: öğrenci TC kimlik numarası (aynı ad soyad çakışmasını önler)
-    const kullaniciAdi = tcNo || ('veli' + studentId);
-    const sifre = tcNo || crypto.randomBytes(4).toString('hex');
-    
-    // Kullanıcı adı zaten var mı kontrol et
+    const kullaniciAdi = normalizeTcDigits(tcNo);
+    if (!isValidVeliTcDigits(kullaniciAdi)) return null;
+
     const existingUser = db.prepare('SELECT id FROM users WHERE kullaniciAdi = ?').get(kullaniciAdi);
-    
+
     if (existingUser) return null;
-    
-    // Veli kullanıcısı oluştur
+
     const stmt = db.prepare(`
       INSERT INTO users (kullaniciAdi, sifre, rol, adSoyad, telefon, email, studentId, subeId, aktif, olusturmaTarihi)
       VALUES (?, ?, 'veli', ?, ?, ?, ?, ?, 1, ?)
     `);
-    
-    // Öğrencinin subeId'sini al
-    const student = db.prepare('SELECT subeId FROM students WHERE id = ?').get(studentId);
-    const subeId = student ? student.subeId : null;
-    
-    const hashedSifre = bcrypt.hashSync(sifre, 10);
+
+    const row = db.prepare('SELECT subeId FROM students WHERE id = ?').get(studentId);
+    const subeId = row ? row.subeId : null;
+
+    const hashedSifre = bcrypt.hashSync(kullaniciAdi, 10);
     const info = stmt.run(kullaniciAdi, hashedSifre, veliAdi, telefon, email, studentId, subeId, new Date().toISOString());
-    
-    // Rastgele şifre üretildiyse dönüşte göster (admin veliye iletebilsin)
-    return { id: info.lastInsertRowid, kullaniciAdi, ...(tcNo ? {} : { sifre }) };
+
+    return { id: info.lastInsertRowid, kullaniciAdi };
   } catch (error) {
     console.error('Veli kullanıcısı oluşturma hatası:', error.message);
     return null;

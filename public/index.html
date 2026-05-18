@@ -360,6 +360,7 @@
             <div class="form-section" style="margin-bottom: 25px; background: #e8f4fd; border: 1px solid #b8daff;">
                 <h3>📥 Excel'den Toplu İçe Aktar</h3>
                 <p style="color: #666; margin-bottom: 15px; font-size: 14px;">Mevcut öğrenci listenizi Excel'de hazırlayıp toplu yükleyebilirsiniz. Önce şablonu indirip sütunları doldurun.</p>
+                <p style="color: #155724; background: #d4edda; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; border: 1px solid #c3e6cb;"><strong>Veli girişi:</strong> Her satırda geçerli 11 haneli TC Kimlik No zorunludur. Veli hesabında kullanıcı adı ve şifre, öğrencinin TC numarasıdır.</p>
                 <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
                     <a href="#" id="downloadTemplateBtn" class="btn-primary" style="text-decoration: none; display: inline-block;">📄 Şablon İndir</a>
                     <input type="file" id="importFileInput" accept=".xlsx,.xls" style="display: none;">
@@ -1061,30 +1062,6 @@
         </div>
     </div>
 
-    <!-- Yeni veli giriş bilgileri (bir kez gösterilir) -->
-    <div id="parentCredentialsModal" class="modal">
-        <div class="modal-content" style="max-width: 520px;">
-            <div class="modal-header">
-                <h2>📱 Veli giriş bilgileri</h2>
-                <span class="close-modal" onclick="closeParentCredentialsModal()">&times;</span>
-            </div>
-            <p style="color: #155724; font-weight: 600; margin-bottom: 12px;">✅ Öğrenci başarıyla eklendi.</p>
-            <div style="background: #f8f9fa; padding: 16px; border-radius: 10px; margin-bottom: 14px; border: 1px solid #dee2e6;">
-                <p style="margin: 0 0 10px 0; font-weight: 600; color: #333;">Veli kullanıcısı oluşturuldu:</p>
-                <p style="margin: 6px 0;"><strong>Kullanıcı adı:</strong> <span id="parentCredUsername" style="font-family: ui-monospace, monospace;"></span></p>
-                <p style="margin: 6px 0;"><strong>Şifre:</strong> <span id="parentCredPassword" style="font-family: ui-monospace, monospace; word-break: break-all;"></span></p>
-            </div>
-            <p style="color: #856404; background: #fff3cd; padding: 12px; border-radius: 8px; font-size: 14px; margin-bottom: 18px;">
-                ⚠️ Bu şifre sadece bir kez gösterilir. Lütfen veliye iletin ve güvenli bir yerde saklayın.
-            </p>
-            <pre id="parentCredentialsCopySource" style="position:absolute;left:-9999px;top:0;" aria-hidden="true"></pre>
-            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                <button type="button" class="btn-primary" onclick="copyParentCredentialsText()" style="flex: 1; min-width: 140px;">📋 Kopyala</button>
-                <button type="button" class="btn-success" onclick="closeParentCredentialsModal()" style="flex: 1; min-width: 140px;">Tamam</button>
-            </div>
-        </div>
-    </div>
-
     <script src="api.js"></script>
     <script src="menu.js"></script>
     <script>
@@ -1115,51 +1092,6 @@
             msg.textContent = text;
             msg.classList.add('show');
             setTimeout(() => msg.classList.remove('show'), 3000);
-        }
-
-        function closeParentCredentialsModal() {
-            document.getElementById('parentCredentialsModal').classList.remove('active');
-        }
-
-        function showParentCredentialsModal(kullaniciAdi, sifre) {
-            document.getElementById('parentCredUsername').textContent = kullaniciAdi;
-            document.getElementById('parentCredPassword').textContent = sifre;
-            const lines = [
-                'Futbol Okulu — Veli giriş bilgileri',
-                'Kullanıcı adı: ' + kullaniciAdi,
-                'Şifre: ' + sifre,
-                '',
-                'Bu şifre yalnızca bir kez gösterildi; veliye güvenli şekilde iletin.'
-            ];
-            document.getElementById('parentCredentialsCopySource').textContent = lines.join('\n');
-            document.getElementById('parentCredentialsModal').classList.add('active');
-        }
-
-        async function copyParentCredentialsText() {
-            const src = document.getElementById('parentCredentialsCopySource');
-            const text = src ? src.textContent : '';
-            try {
-                await navigator.clipboard.writeText(text);
-                showMessage('✅ Bilgiler panoya kopyalandı');
-            } catch (err) {
-                try {
-                    src.style.position = 'fixed';
-                    src.style.left = '0';
-                    src.style.opacity = '0';
-                    const range = document.createRange();
-                    range.selectNodeContents(src);
-                    const sel = window.getSelection();
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                    document.execCommand('copy');
-                    sel.removeAllRanges();
-                    src.style.position = 'absolute';
-                    src.style.left = '-9999px';
-                    showMessage('✅ Bilgiler panoya kopyalandı');
-                } catch (e2) {
-                    showMessage('❌ Kopyalanamadı. Metni elle seçip kopyalayın.');
-                }
-            }
         }
 
         function csvEscape(value) {
@@ -1432,10 +1364,7 @@
                     resultEl.style.background = '#d4edda';
                     resultEl.style.color = '#155724';
                     let msg = `✅ ${data.imported} öğrenci içe aktarıldı.`;
-                    if (data.errors && data.errors.length > 0) msg += `<br><small>${data.errors.length} satır atlandı: ${data.errors.slice(0, 3).map(e => e.msg).join('; ')}${data.errors.length > 3 ? '...' : ''}</small>`;
-                    if (data.parentCredentials && data.parentCredentials.length > 0) {
-                        msg += `<br><strong>TC olmayan veli şifreleri (veliye iletin):</strong><br><small>${data.parentCredentials.map(p => `Satır ${p.row} - ${esc(p.ogrenci)}: Kullanıcı: ${esc(p.kullaniciAdi)}, Şifre: ${esc(p.sifre)}`).join('<br>')}</small>`;
-                    }
+                    if (data.errors && data.errors.length > 0) msg += `<br><small>${data.errors.length} satır atlandı: ${data.errors.slice(0, 5).map(e => `Satır ${e.row}: ${esc(e.msg)}`).join('; ')}${data.errors.length > 5 ? '...' : ''}</small>`;
                     resultEl.innerHTML = msg;
                     loadStudents();
                     selectedImportFile = null;
@@ -1464,10 +1393,11 @@
                 ? currentUser.subeId 
                 : parseInt(document.getElementById('studentSube').value);
 
+            const tcRaw = document.getElementById('tcNo').value;
             const student = {
                 ad: document.getElementById('studentName').value,
                 soyad: document.getElementById('studentSurname').value,
-                tcNo: document.getElementById('tcNo').value,
+                tcNo: tcRaw,
                 dogumTarihi: document.getElementById('birthDate').value,
                 subeId: subeId,
                 groupId: parseInt(document.getElementById('studentGroup').value),
@@ -1490,20 +1420,13 @@
                 });
 
                 if (response.ok) {
-                    const data = await response.json();
-                    const pc = data.parentCredentials;
-                    const veliUser = pc && (pc.kullaniciAdi || pc.kullaniciadi);
-                    const veliPass = pc && pc.sifre;
-                    if (veliUser && veliPass) {
-                        showParentCredentialsModal(veliUser, veliPass);
-                        showMessage('✅ Öğrenci kaydedildi — veli bilgileri pencerede');
-                    } else {
-                        showMessage('✅ Öğrenci başarıyla kaydedildi. Veli hesabı oluşturulmadı (bu TC ile kullanıcı zaten kayıtlı olabilir veya veli eklenemedi).');
-                    }
+                    await response.json().catch(() => ({}));
+                    showMessage('Öğrenci eklendi. Veli giriş: TC No (kullanıcı adı ve şifre olarak)');
                     document.getElementById('studentForm').reset();
                     loadStudents();
                 } else {
-                    showMessage('❌ Kayıt başarısız!');
+                    const errData = await response.json().catch(() => ({}));
+                    showMessage('❌ ' + (errData.error || 'Kayıt başarısız!'));
                 }
             } catch (error) {
                 showMessage('❌ Hata: ' + error.message);

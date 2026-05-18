@@ -261,6 +261,9 @@ app.post('/api/students', auth.requireAdminOrYonetici, async (req, res) => {
     const newStudent = await db.addStudent(student);
     res.json(newStudent);
   } catch (error) {
+    const raw = error && error.message;
+    const badReq = /TC Kimlik No zorunlu|veli hesabı oluşturulamadı|Bu TC ile kayıtlı veli/i.test(raw || '');
+    if (badReq) return res.status(400).json({ error: raw });
     res.status(500).json({ error: safeErr(error.message) });
   }
 });
@@ -321,7 +324,7 @@ app.post('/api/students/import', auth.requireAdminOrYonetici, (req, res, next) =
       return -1;
     };
 
-    const results = { imported: 0, errors: [], parentCredentials: [] };
+    const results = { imported: 0, errors: [] };
     const today = new Date().toISOString().split('T')[0];
 
     for (let i = 1; i < rows.length; i++) {
@@ -385,10 +388,16 @@ app.post('/api/students/import', auth.requireAdminOrYonetici, (req, res, next) =
       }
       if (!dogumTarihi) dogumTarihi = today;
 
+      const tcDigits = String(get(col('tc')) || '').replace(/\D/g, '');
+      if (!/^\d{11}$/.test(tcDigits)) {
+        results.errors.push({ row: i + 1, msg: 'TC Kimlik No zorunlu - veli hesabı oluşturulamadı' });
+        continue;
+      }
+
       const student = {
         ad,
         soyad,
-        tcNo: get(col('tc')) || null,
+        tcNo: tcDigits,
         dogumTarihi,
         veliAdi,
         email: get(col('email')) || null,
@@ -402,16 +411,8 @@ app.post('/api/students/import', auth.requireAdminOrYonetici, (req, res, next) =
         subeId
       };
       try {
-        const added = await db.addStudent(student);
+        await db.addStudent(student);
         results.imported++;
-        if (added.parentCredentials && added.parentCredentials.sifre) {
-          results.parentCredentials.push({
-            row: i + 1,
-            ogrenci: `${ad} ${soyad}`,
-            kullaniciAdi: added.parentCredentials.kullaniciAdi,
-            sifre: added.parentCredentials.sifre
-          });
-        }
       } catch (err) {
         results.errors.push({ row: i + 1, msg: err.message || 'Kayıt hatası' });
       }
@@ -584,8 +585,8 @@ app.post('/api/login', async (req, res) => {
     
     const token = auth.generateToken(user);
     let mustChangePassword = false;
-    const userRol = user.kullaniciAdi ?? user.kullaniciadi;
-    if (userRol === 'admin') {
+    const rol = user.rol ?? user.ROL;
+    if (rol === 'admin') {
       const initialHash = await db.getSetting('admin_initial_password_hash');
       logger.debug('Login getSetting', { ms: Date.now() - t0 });
       mustChangePassword = !!initialHash && (await bcrypt.compare(sifre, initialHash));
