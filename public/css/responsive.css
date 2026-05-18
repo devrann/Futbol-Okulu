@@ -59,6 +59,70 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
   padding: 0;
 }
 
+/* Masaüstü — tek satır: logo | menü | kullanıcı + çıkış (mobil kurallara dokunmaz) */
+@media (min-width: 769px) {
+  .header:not(.header-veli) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 20px;
+    row-gap: 12px;
+    flex-wrap: nowrap !important;
+  }
+
+  .header:not(.header-veli) > .logo {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    order: unset !important;
+    width: auto !important;
+    flex: unset !important;
+  }
+
+  /* Logo ile menü arasında makul boşluk: grid gap + ek iç ofset */
+  .header:not(.header-veli) > #navMenu,
+  .header:not(.header-veli) > .nav-menu {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: start;
+    align-self: center;
+    min-width: 0;
+    margin-left: 28px;
+    order: unset !important;
+    width: auto !important;
+    max-width: 100%;
+  }
+
+  .header:not(.header-veli) > .nav-menu > #navMenu {
+    margin-left: 0;
+    max-width: 100%;
+  }
+
+  .header:not(.header-veli) .user-info {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    align-self: center;
+    order: unset !important;
+    width: auto !important;
+    flex-wrap: nowrap;
+  }
+
+  /* index.html — özet şeridi tam genişlik ikinci satır */
+  .header:not(.header-veli) > .stats {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+    order: unset !important;
+  }
+
+  .header:not(.header-veli) #navMenu.nav-wrapper,
+  .header:not(.header-veli) .nav-wrapper {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 768px) {
   .header {
     flex-wrap: wrap;
