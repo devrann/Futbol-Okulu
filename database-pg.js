@@ -714,7 +714,7 @@ async function createParentUser(client, studentId, veliAdi, tcNo, telefon, email
     const subeId = studentRes.rows[0]?.subeid ?? studentRes.rows[0]?.subeId ?? null;
     const hashedSifre = await bcrypt.hash(sifre, 10);
     const res = await pool.query(`
-      INSERT INTO users (kullaniciAdi, sifre, rol, adSoyad, telefon, email, studentId, subeId, aktif, olusturmaTarihi)
+      INSERT INTO users (kullaniciadi, sifre, rol, adsoyad, telefon, email, studentid, subeid, aktif, olusturmatarihi)
       VALUES ($1, $2, 'veli', $3, $4, $5, $6, $7, 1, $8)
       RETURNING id
     `, [kullaniciAdi, hashedSifre, veliAdi, telefon || null, email || null, studentId, subeId, new Date().toISOString()]);
