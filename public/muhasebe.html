@@ -311,7 +311,6 @@
                 return;
             }
             currentUser = JSON.parse(user);
-            document.getElementById('currentUserName').textContent = currentUser.adSoyad;
             if (!['admin', 'yonetici'].includes(currentUser.rol)) {
                 alert('Bu sayfaya erişim yetkiniz yok!');
                 window.location.href = 'index.html';

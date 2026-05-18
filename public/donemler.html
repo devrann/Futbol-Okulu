@@ -349,7 +349,6 @@
             }
             
             const userData = JSON.parse(user);
-            document.getElementById('currentUserName').textContent = userData.adSoyad;
             
             if (!['admin', 'yonetici'].includes(userData.rol)) {
                 alert('Bu sayfaya erişim yetkiniz yok!');

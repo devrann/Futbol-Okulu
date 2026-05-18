@@ -60,9 +60,9 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
   padding: 0;
 }
 
-/* Üst çubukta isim gizli — Çıkış kalır (veli/login hariç) */
-.header:not(.header-veli) .user-info > #currentUserName,
-.header:not(.header-veli) .user-info > span.user-name {
+/* Üst çubukta isim gizli — Çıkış kalır (veli/login hariç; .header-veli veli paneli) */
+.header:not(.header-veli) .user-info #currentUserName,
+.header:not(.header-veli) .user-info span.user-name {
   display: none !important;
 }
 

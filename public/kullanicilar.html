@@ -333,16 +333,16 @@
     <link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">⚽ Kullanıcı Yönetimi</div>
-            <div id="navMenu"></div>
-            <div class="user-info">
-                <span id="currentUserName"></span>
-                <button class="logout-btn" onclick="logout()">Çıkış</button>
-            </div>
+    <div class="header">
+        <div class="logo">⚽ Kullanıcı Yönetimi</div>
+        <div id="navMenu"></div>
+        <div class="user-info">
+            <span id="currentUserName"></span>
+            <button class="logout-btn" onclick="logout()">Çıkış</button>
         </div>
+    </div>
 
+    <div class="container">
         <div class="content">
             <div id="mustChangePasswordBanner" class="warning-box" style="display: none;">
                 <strong>⚠️ Güvenlik:</strong> Varsayılan admin şifresini kullanıyorsunuz. Lütfen aşağıdan kendi kullanıcınızı düzenleyip şifrenizi değiştirin.
@@ -554,8 +554,6 @@
                 window.location.href = 'index.html';
                 return;
             }
-            
-            document.getElementById('currentUserName').textContent = currentUser.adSoyad;
             
             // Yönetici ise sadece antrenör ekleyebilir
             if (currentUser.rol === 'yonetici') {

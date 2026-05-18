@@ -1,4 +1,15 @@
 (function () {
+    /** Staff üst çubuğunda ad soyad gösterme (veli paneli hariç) */
+    function hideStaffHeaderDisplayName() {
+        const el = document.getElementById('currentUserName');
+        if (!el) return;
+        const header = el.closest('.header');
+        if (!header || header.classList.contains('header-veli')) return;
+        el.textContent = '';
+        el.setAttribute('aria-hidden', 'true');
+        el.style.setProperty('display', 'none', 'important');
+    }
+
     function buildMenu() {
         const userRaw = localStorage.getItem('currentUser');
         if (!userRaw) return;
@@ -59,6 +70,9 @@
                 }
             });
         }
+
+        hideStaffHeaderDisplayName();
+        setTimeout(hideStaffHeaderDisplayName, 0);
     }
 
     if (document.readyState === 'loading') {
