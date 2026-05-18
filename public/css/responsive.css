@@ -15,7 +15,7 @@ body {
 
 /* Touch-friendly - tap highlight kaldır, dokunmatik optimizasyon */
 button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
-.nav-menu a, #navMenu a, .nav-links a, .hamburger-btn {
+.nav-menu a, #navMenu a, .nav-links a, .nav-link, .hamburger-btn {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
@@ -35,11 +35,12 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
   flex-wrap: wrap;
 }
 
+.nav-wrapper .nav-links a.nav-link,
 .nav-wrapper .nav-links a {
-  padding: 8px 12px;
-  min-height: 40px;
   display: inline-flex;
   align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
 }
 
 .hamburger-btn {
@@ -59,7 +60,13 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
   padding: 0;
 }
 
-/* Masaüstü — tek satır: logo | menü | kullanıcı + çıkış (mobil kurallara dokunmaz) */
+/* Üst çubukta isim gizli — Çıkış kalır (veli/login hariç) */
+.header:not(.header-veli) .user-info > #currentUserName,
+.header:not(.header-veli) .user-info > span.user-name {
+  display: none !important;
+}
+
+/* Masaüstü — tek satır: logo | menü | çıkış + kompakt nav */
 @media (min-width: 769px) {
   .header:not(.header-veli) {
     display: grid;
@@ -120,6 +127,52 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
   .header:not(.header-veli) #navMenu.nav-wrapper,
   .header:not(.header-veli) .nav-wrapper {
     max-width: 100%;
+    flex-wrap: nowrap !important;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .header:not(.header-veli) #navMenu .nav-links {
+    flex-wrap: nowrap !important;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .header:not(.header-veli) #navMenu .nav-links a.nav-link {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #fff !important;
+    background: #667eea !important;
+    border-radius: 8px;
+    text-decoration: none !important;
+    white-space: nowrap;
+    min-height: auto !important;
+    width: auto !important;
+  }
+
+  .header:not(.header-veli) #navMenu .nav-links a.nav-link.admin-link {
+    background: #dc3545 !important;
+  }
+
+  .header:not(.header-veli) #navMenu .nav-links a.nav-link:hover {
+    background: #5568d3 !important;
+    color: #fff !important;
+  }
+
+  .header:not(.header-veli) #navMenu .nav-links a.nav-link.admin-link:hover {
+    background: #c82333 !important;
+  }
+
+  .header:not(.header-veli) .user-info .btn-danger,
+  .header:not(.header-veli) .user-info .logout-btn {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+    font-weight: 600;
+    min-height: auto !important;
+    min-width: auto !important;
   }
 }
 
@@ -183,6 +236,7 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
     display: flex !important;
   }
 
+  .nav-wrapper .nav-links a.nav-link,
   .nav-wrapper .nav-links a {
     width: 100%;
     justify-content: flex-start;
@@ -190,6 +244,19 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
     font-size: 15px !important;
     min-height: 48px;
     border-radius: 8px;
+    box-sizing: border-box;
+    background: #667eea !important;
+    color: #fff !important;
+    font-weight: 600;
+    text-decoration: none !important;
+  }
+
+  .nav-wrapper .nav-links a.nav-link.admin-link {
+    background: #dc3545 !important;
+  }
+
+  .nav-wrapper .nav-links a.nav-link:hover {
+    filter: brightness(0.95);
   }
 
   .nav-menu, #navMenu, .nav-wrapper {
@@ -201,11 +268,21 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
     width: 100%;
   }
 
-  .nav-menu a, #navMenu .nav-links a {
-    padding: 10px 14px !important;
-    font-size: 13px !important;
-    min-height: 44px;
+  /* Eski seçici uyumu — nav-link öncelikli */
+  .nav-menu a.nav-link,
+  #navMenu .nav-links a.nav-link,
+  #navMenu .nav-links a {
+    padding: 14px 16px !important;
+    font-size: 15px !important;
+    min-height: 48px;
     min-width: auto;
+    background: #667eea !important;
+    color: #fff !important;
+    font-weight: 600;
+  }
+
+  #navMenu .nav-links a.nav-link.admin-link {
+    background: #dc3545 !important;
   }
 
   /* Form grid - mobilde tek sütun */
@@ -275,7 +352,8 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
     align-items: center;
   }
 
-  .user-name, #currentUserName {
+  .header-veli .user-name,
+  .header-veli #currentUserName {
     font-size: 14px !important;
     max-width: 120px;
     overflow: hidden;

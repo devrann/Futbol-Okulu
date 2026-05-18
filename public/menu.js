@@ -33,16 +33,10 @@
             ];
         }
 
-        const baseStyle =
-            'padding: 8px 12px; background: #667eea; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;';
-
         const linksHtml = items
             .map(item => {
-                const style = item.isAdmin
-                    ? `${baseStyle} background: #dc3545;`
-                    : baseStyle;
-                const className = item.isAdmin ? 'admin-link' : '';
-                return `<a href="${item.href}" class="${className}" style="${style}">${item.text}</a>`;
+                const classes = item.isAdmin ? 'nav-link admin-link' : 'nav-link';
+                return `<a href="${item.href}" class="${classes}">${item.text}</a>`;
             })
             .join('');
 
