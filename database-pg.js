@@ -555,19 +555,22 @@ async function migratePasswordsToHash(client) {
   }
 }
 
+/** Eski sürümdeki yanlış re-seed'i tek sefer temizler; yeni kurulumda hash'in silinmemesi için bayrak kullanılır. */
+const ADMIN_INITIAL_PW_LEGACY_CLEANUP_FLAG = 'admin_initial_password_legacy_cleanup_v1';
+
 async function ensureAdminUser() {
   const client = await pool.connect();
   try {
     await client.query("SET statement_timeout = '10s'");
     const check = await client.query("SELECT id, sifre FROM users WHERE kullaniciadi = 'admin'");
     if (check.rows.length > 0) {
-      const admin = check.rows[0];
-      const flagCheck = await client.query("SELECT deger FROM settings WHERE anahtar = 'admin_initial_password_hash'");
-      if (flagCheck.rows.length === 0) {
+      const flagRes = await client.query('SELECT deger FROM settings WHERE anahtar = $1', [ADMIN_INITIAL_PW_LEGACY_CLEANUP_FLAG]);
+      if (flagRes.rows.length === 0) {
+        await client.query("DELETE FROM settings WHERE anahtar = 'admin_initial_password_hash'");
         await client.query(`
-          INSERT INTO settings (anahtar, deger) VALUES ('admin_initial_password_hash', $1)
-          ON CONFLICT (anahtar) DO UPDATE SET deger = $1
-        `, [admin.sifre]);
+          INSERT INTO settings (anahtar, deger) VALUES ($1, '1')
+          ON CONFLICT (anahtar) DO UPDATE SET deger = '1'
+        `, [ADMIN_INITIAL_PW_LEGACY_CLEANUP_FLAG]);
       }
       return;
     }
@@ -581,6 +584,10 @@ async function ensureAdminUser() {
       INSERT INTO settings (anahtar, deger) VALUES ('admin_initial_password_hash', $1)
       ON CONFLICT (anahtar) DO UPDATE SET deger = $1
     `, [adminHash]);
+    await client.query(`
+      INSERT INTO settings (anahtar, deger) VALUES ($1, '1')
+      ON CONFLICT (anahtar) DO UPDATE SET deger = '1'
+    `, [ADMIN_INITIAL_PW_LEGACY_CLEANUP_FLAG]);
     const credPath = path.join(__dirname, 'admin-initial-credentials.txt');
     fs.writeFileSync(credPath, `Futbol Okulu - İlk Giriş Bilgileri\n${'='.repeat(40)}\nKullanıcı: admin\nŞifre: ${randomPw}\n\n⚠️ İlk girişte şifreyi değiştirin ve bu dosyayı silin!\n`);
     console.log('⚠️ Admin oluşturuldu. Şifre: admin-initial-credentials.txt');

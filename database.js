@@ -388,13 +388,15 @@ db.exec(`
 `);
 
 // Admin kullanıcısı - ilk kurulumda rastgele şifre üret (güvenlik)
+const ADMIN_INITIAL_PW_LEGACY_CLEANUP_FLAG = 'admin_initial_password_legacy_cleanup_v1';
+
 function ensureAdminUser() {
   const adminExists = db.prepare("SELECT id, sifre FROM users WHERE kullaniciAdi = 'admin'").get();
   if (adminExists) {
-    // Mevcut DB: admin123 ile girişte şifre değiştirme zorunlu (migration)
-    const hasInitialFlag = db.prepare("SELECT deger FROM settings WHERE anahtar = 'admin_initial_password_hash'").get();
-    if (!hasInitialFlag) {
-      db.prepare("INSERT OR REPLACE INTO settings (anahtar, deger) VALUES ('admin_initial_password_hash', ?)").run(adminExists.sifre);
+    const flag = db.prepare('SELECT deger FROM settings WHERE anahtar = ?').get(ADMIN_INITIAL_PW_LEGACY_CLEANUP_FLAG);
+    if (!flag) {
+      db.prepare("DELETE FROM settings WHERE anahtar = 'admin_initial_password_hash'").run();
+      db.prepare('INSERT OR REPLACE INTO settings (anahtar, deger) VALUES (?, ?)').run(ADMIN_INITIAL_PW_LEGACY_CLEANUP_FLAG, '1');
     }
     return;
   }
@@ -405,6 +407,7 @@ function ensureAdminUser() {
     VALUES ('admin', ?, 'admin', 'Sistem Yöneticisi', '', 1, datetime('now'))
   `).run(adminHash);
   db.prepare("INSERT OR REPLACE INTO settings (anahtar, deger) VALUES ('admin_initial_password_hash', ?)").run(adminHash);
+  db.prepare('INSERT OR REPLACE INTO settings (anahtar, deger) VALUES (?, ?)').run(ADMIN_INITIAL_PW_LEGACY_CLEANUP_FLAG, '1');
   const credPath = path.join(__dirname, 'admin-initial-credentials.txt');
   fs.writeFileSync(credPath, `Futbol Okulu - İlk Giriş Bilgileri\n${'='.repeat(40)}\nKullanıcı: admin\nŞifre: ${randomPw}\n\n⚠️ İlk girişte şifreyi değiştirin ve bu dosyayı silin!\n`);
   console.log('⚠️ Admin oluşturuldu. Şifre: admin-initial-credentials.txt');
