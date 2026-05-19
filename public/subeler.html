@@ -23,29 +23,31 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
+            padding-bottom: 50px;
         }
 
         .header {
             background: white;
-            padding: 20px 30px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         .logo {
             font-size: 24px;
             font-weight: bold;
             color: #667eea;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
         }
 
         .content {
@@ -206,13 +208,16 @@
     <link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">⚽ Futbol Okulu Yönetim Sistemi</div>
-            <div class="nav-links" id="navMenu"></div>
-            <button class="btn-primary" onclick="logout()">Çıkış</button>
+    <div class="header">
+        <div class="logo">⚽ Futbol Okulu Yönetim Sistemi</div>
+        <div id="navMenu"></div>
+        <div class="user-info">
+            <span id="currentUserName"></span>
+            <button type="button" onclick="logout()" class="btn-danger">Çıkış</button>
         </div>
+    </div>
 
+    <div class="container">
         <div class="content">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2>Şubeler</h2>

@@ -140,10 +140,10 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
   }
 
   .header:not(.header-veli) #navMenu .nav-links a.nav-link {
-    padding: 6px 12px !important;
+    padding: 8px 12px !important;
     font-size: 13px !important;
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 1.25;
     color: #fff !important;
     background: #667eea !important;
     border-radius: 8px;
@@ -168,7 +168,7 @@ button, .btn-danger, .btn-primary, .btn-success, .btn-login, .btn-edit,
 
   .header:not(.header-veli) .user-info .btn-danger,
   .header:not(.header-veli) .user-info .logout-btn {
-    padding: 6px 12px !important;
+    padding: 8px 12px !important;
     font-size: 13px !important;
     font-weight: 600;
     min-height: auto !important;
