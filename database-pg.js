@@ -2188,8 +2188,8 @@ async function getReportSummary(subeId, startDate, endDate) {
   }
 
   students.forEach(s => {
-    if (s.dogumtarihi) {
-      const birth = parseBirthDate(s.dogumtarihi);
+    if (s.dogumTarihi) {
+      const birth = parseBirthDate(s.dogumTarihi);
       if (birth) {
         const now = new Date();
         let age = now.getFullYear() - birth.getFullYear();
@@ -2207,10 +2207,10 @@ async function getReportSummary(subeId, startDate, endDate) {
     schoolStats[schoolKey] = (schoolStats[schoolKey] || 0) + 1;
     const mahalleKey = s.mahalle || '-';
     mahalleStats[mahalleKey] = (mahalleStats[mahalleKey] || 0) + 1;
-    if (s.kayittarihi) {
-      const kayitDate = new Date(s.kayittarihi);
+    if (s.kayitTarihi) {
+      const kayitDate = new Date(s.kayitTarihi);
       if (kayitDate >= start && kayitDate <= end) {
-        const sourceKey = s.kayitkaynagi || '-';
+        const sourceKey = s.kayitKaynagi || '-';
         sourceStats[sourceKey] = (sourceStats[sourceKey] || 0) + 1;
       }
     }
